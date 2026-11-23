@@ -1698,7 +1698,11 @@ impl AppWindow {
             self.seen_check = None;
             return HashSet::new();
         }
-        let visible: HashSet<String> = self.visible_addresses().into_iter().collect();
+        let mut visible: HashSet<String> = self.visible_addresses().into_iter().collect();
+        if settings::get().seen_focused_only {
+            let focused = self.focused_address();
+            visible.retain(|a| focused.as_ref() == Some(a));
+        }
         let now = Instant::now();
         self.visible_since.retain(|a, _| visible.contains(a));
         for a in &visible {
@@ -1729,6 +1733,13 @@ impl AppWindow {
             })
         });
         looked
+    }
+
+    /// The terminal the focused pane shows, or the agent view's agent when no
+    /// terminal pane has focus.
+    fn focused_address(&self) -> Option<String> {
+        self.focused_pane.as_deref().and_then(|p| self.pane_term(p)).map(|t| t.address.clone())
+            .or_else(|| self.shows_agent().then(|| self.shown_agent()).flatten())
     }
 
     /// A done agent's time on screen ran out: it's seen now if it stayed.

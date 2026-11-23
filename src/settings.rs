@@ -408,6 +408,9 @@ pub struct Person {
     /// seen (done turns idle). 0: at once. Lets agent.next/prev skim past agents.
     #[serde(skip_serializing_if = "is_zero")]
     pub seen_delay_ms: u64,
+    /// Only the focused pane's agent counts as seen, not every agent on screen.
+    #[serde(skip_serializing_if = "is_false")]
+    pub seen_focused_only: bool,
     /// Minimum terminal text contrast ratio; 1 leaves program colors unchanged.
     pub minimum_contrast: f32,
     /// macOS Option sends Alt shortcuts, or follows the keyboard layout.
@@ -458,6 +461,10 @@ fn is_true(b: &bool) -> bool {
     *b
 }
 
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
 fn is_zero(n: &u64) -> bool {
     *n == 0
 }
@@ -481,6 +488,7 @@ impl Default for Person {
             copy_on_select: true,
             pane_scrollbars: true,
             seen_delay_ms: 0,
+            seen_focused_only: false,
             minimum_contrast: 1.0,
             option_as_alt: OptionAsAlt::Auto,
             appearance: Appearance::System,
@@ -532,6 +540,8 @@ pub struct Settings {
     pub sounds: Sounds,
     /// Ms on screen before an agent counts as seen (Person::seen_delay_ms).
     pub seen_delay_ms: u64,
+    /// Only the focused pane's agent counts as seen (Person::seen_focused_only).
+    pub seen_focused_only: bool,
 }
 
 /// Attention sounds: when an agent needs you, and when one finished while you
@@ -580,6 +590,7 @@ impl Default for Settings {
             option_as_alt: OptionAsAlt::Auto,
             sounds: Sounds::default(),
             seen_delay_ms: 0,
+            seen_focused_only: false,
         }
     }
 }
@@ -624,6 +635,7 @@ impl Settings {
             minimum_contrast: person.minimum_contrast,
             option_as_alt: person.option_as_alt,
             seen_delay_ms: person.seen_delay_ms,
+            seen_focused_only: person.seen_focused_only,
         }
     }
 }

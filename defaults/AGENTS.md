@@ -831,6 +831,9 @@ What's about the user, never a look:
   window before a finish counts as seen and `done` turns `idle` (default
   `0`: at once). With e.g. `1000`, skimming agents with `agent.next` /
   `agent.prev` leaves them `done`.
+- `seen_focused_only`: `true` makes only the focused pane's agent count as
+  seen, so other agents on screen in the same space stay `done` (default
+  `false`: every agent on screen).
 - `telemetry`: `false` stops anonymous usage data and deletes what wasn't
   sent (on when absent; Settings → Privacy shows each report word for
   word, and `telemetry()` in mods). Once a day the app sends counts:
