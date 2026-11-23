@@ -404,6 +404,10 @@ pub struct Person {
     /// A draggable scroll position thumb at a terminal pane's right edge.
     #[serde(skip_serializing_if = "is_true")]
     pub pane_scrollbars: bool,
+    /// How long, in ms, an agent must stay on screen before its finish counts as
+    /// seen (done turns idle). 0: at once. Lets agent.next/prev skim past agents.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub seen_delay_ms: u64,
     /// Minimum terminal text contrast ratio; 1 leaves program colors unchanged.
     pub minimum_contrast: f32,
     /// macOS Option sends Alt shortcuts, or follows the keyboard layout.
@@ -454,6 +458,10 @@ fn is_true(b: &bool) -> bool {
     *b
 }
 
+fn is_zero(n: &u64) -> bool {
+    *n == 0
+}
+
 impl Default for Person {
     fn default() -> Self {
         Person {
@@ -472,6 +480,7 @@ impl Default for Person {
             clipboard_write: true,
             copy_on_select: true,
             pane_scrollbars: true,
+            seen_delay_ms: 0,
             minimum_contrast: 1.0,
             option_as_alt: OptionAsAlt::Auto,
             appearance: Appearance::System,
@@ -521,6 +530,8 @@ pub struct Settings {
     pub minimum_contrast: f32,
     pub option_as_alt: OptionAsAlt,
     pub sounds: Sounds,
+    /// Ms on screen before an agent counts as seen (Person::seen_delay_ms).
+    pub seen_delay_ms: u64,
 }
 
 /// Attention sounds: when an agent needs you, and when one finished while you
@@ -568,6 +579,7 @@ impl Default for Settings {
             minimum_contrast: 1.0,
             option_as_alt: OptionAsAlt::Auto,
             sounds: Sounds::default(),
+            seen_delay_ms: 0,
         }
     }
 }
@@ -611,6 +623,7 @@ impl Settings {
             copy_on_select: person.copy_on_select,
             minimum_contrast: person.minimum_contrast,
             option_as_alt: person.option_as_alt,
+            seen_delay_ms: person.seen_delay_ms,
         }
     }
 }

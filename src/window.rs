@@ -444,6 +444,10 @@ pub struct AppWindow {
     written_seen: HashMap<String, u64>,
     /// Agents the person is looking at, and the turn they were shared as seen at.
     looked: HashMap<String, u64>,
+    /// When each terminal on screen in the active window came into view
+    /// (`seen_delay_ms`), and the check for the next one to count as seen.
+    visible_since: HashMap<String, Instant>,
+    seen_check: Option<Task<()>>,
     watched: Watched,
     /// Core's terminal records by address.
     live: HashMap<String, Value>,
@@ -562,6 +566,8 @@ impl AppWindow {
             written_where: HashMap::new(),
             written_seen: HashMap::new(),
             looked: HashMap::new(),
+            visible_since: HashMap::new(),
+            seen_check: None,
             watched: Watched::default(),
             live: HashMap::new(),
             listed_once: false,
@@ -1675,14 +1681,66 @@ impl AppWindow {
         } else if revealed {
             self.refocus_pane(window, cx);
         }
-        if self.window_active {
-            let visible = self.visible_addresses();
-            self.model.mark_seen(&visible);
-        }
+        let looked: Vec<String> = self.looked_at(cx).into_iter().collect();
+        self.model.mark_seen(&looked);
         self.share_seen(cx);
         self.publish(cx);
         self.save();
         cx.notify();
+    }
+
+    /// What the person has looked at: terminals on screen in the active window
+    /// for at least `seen_delay_ms`, so skimming past an agent (agent.next) leaves
+    /// it done. A done agent not there yet gets a check for when it will be.
+    fn looked_at(&mut self, cx: &mut Context<Self>) -> HashSet<String> {
+        if !self.window_active {
+            self.visible_since.clear();
+            self.seen_check = None;
+            return HashSet::new();
+        }
+        let visible: HashSet<String> = self.visible_addresses().into_iter().collect();
+        let now = Instant::now();
+        self.visible_since.retain(|a, _| visible.contains(a));
+        for a in &visible {
+            self.visible_since.entry(a.clone()).or_insert(now);
+        }
+        let delay = Duration::from_millis(settings::get().seen_delay_ms);
+        if delay.is_zero() {
+            return visible;
+        }
+        let mut wait: Option<Duration> = None;
+        let looked = visible
+            .into_iter()
+            .filter(|a| {
+                let on = now.duration_since(self.visible_since[a]);
+                if on >= delay {
+                    return true;
+                }
+                if self.model.status(a) == Some("done") {
+                    wait = Some(wait.map_or(delay - on, |w| w.min(delay - on)));
+                }
+                false
+            })
+            .collect();
+        self.seen_check = wait.map(|wait| {
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(wait).await;
+                let _ = this.update(cx, |this, cx| this.check_seen(cx));
+            })
+        });
+        looked
+    }
+
+    /// A done agent's time on screen ran out: it's seen now if it stayed.
+    fn check_seen(&mut self, cx: &mut Context<Self>) {
+        let looked: Vec<String> = self.looked_at(cx).into_iter().collect();
+        let mut changed = self.model.mark_seen(&looked);
+        changed |= self.share_seen(cx);
+        if changed {
+            self.publish(cx);
+            self.save();
+            cx.notify();
+        }
     }
 
     /// Shares what the person looks at as `herdr.seen` (docs/labels.md): an
@@ -1690,7 +1748,7 @@ impl AppWindow {
     /// there, so a phone marking it unread isn't undone by a screen nobody
     /// watches. Only ever raises it. True when a status changed.
     fn share_seen(&mut self, cx: &mut Context<Self>) -> bool {
-        let looking: HashSet<String> = if self.window_active { self.visible_addresses().into_iter().collect() } else { HashSet::new() };
+        let looking = self.looked_at(cx);
         self.looked.retain(|a, _| looking.contains(a));
         let mut changed = false;
         for addr in looking {
@@ -2303,12 +2361,12 @@ impl AppWindow {
         // Place newly labeled terminals first: one that is blocked on its first
         // listing is ours, and must ring.
         let mut changed = self.reconcile(window, cx);
-        let visible: HashSet<String> = self.visible_addresses().into_iter().collect();
+        let looked = self.looked_at(cx);
         let mut alerts = Vec::new();
         for (addr, rec) in &self.live {
             let word = rec.get("status").and_then(Value::as_str).map(str::to_owned);
             let app = rec.get("report").and_then(|r| r.get("app")).and_then(Value::as_str).filter(|s| !s.is_empty()).map(str::to_owned);
-            let looking = visible.contains(addr) && self.window_active;
+            let looking = looked.contains(addr);
             let prev = self.model.agents.get(addr).and_then(|a| a.word.clone());
             let child = rec.get("parent").and_then(Value::as_str).is_some_and(|p| !p.is_empty());
             if let Some(alert) = self.model.alert_for(addr, child, prev.as_deref(), word.as_deref(), looking) {
@@ -4293,6 +4351,8 @@ impl AppWindow {
                 self.sync(window, cx);
             } else {
                 self.looked.clear();
+                self.visible_since.clear();
+                self.seen_check = None;
             }
             // Tell mods now: render publishes window() too, but a mod it refreshes
             // waits for another frame, which an idle window that just lost focus
