@@ -1,0 +1,38 @@
+#!/bin/bash
+# Builds this fork and puts it in /Applications/Herdr.app in place of the
+# release build, so Herdr opens from the Dock/Spotlight like before. A source
+# build never auto-updates (see src/update.rs), so the release can't replace it.
+# The release build is backed up once to ~/.local/share/herdr-app-backup.
+set -euo pipefail
+
+[[ $(uname -s) == Darwin ]] || { echo 'This installer requires macOS.' >&2; exit 1; }
+cd "$(dirname "$0")/.."
+
+mise x zig@0.16.0 rust@stable -- "$HOME/.cargo/bin/cargo" build --release --locked
+
+app=/Applications/Herdr.app
+backup="$HOME/.local/share/herdr-app-backup"
+version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist" 2>/dev/null || echo unknown)
+if [[ -d $app && $version != *-fork.* ]]; then
+  mkdir -p "$backup"
+  [[ -d $backup/Herdr-$version.app ]] || ditto "$app" "$backup/Herdr-$version.app"
+  echo "Release build backed up to $backup/Herdr-$version.app"
+fi
+
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+# Replace atomically so installing does not interrupt a running Herdr.
+cp target/release/herdr-app "$app/Contents/MacOS/Herdr.new"
+mv -f "$app/Contents/MacOS/Herdr.new" "$app/Contents/MacOS/Herdr"
+chmod +x "$app/Contents/MacOS/Herdr"
+cp assets/icons/Herdr.icns "$app/Contents/Resources/Herdr.icns"
+
+version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+commit=$(git rev-parse --short HEAD)
+plist="$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version-fork.$commit" "$plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $version" "$plist"
+# Same bundle id keeps permissions (mic, camera, automation) the release had.
+codesign --force --sign - "$app"
+ln -sfn "$app/Contents/MacOS/Herdr" "$HOME/.local/bin/herdr-app"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$app"
+echo "Installed fork $version-fork.$commit to $app. Quit and reopen Herdr to use it."
