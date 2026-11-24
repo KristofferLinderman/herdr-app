@@ -96,7 +96,7 @@ pub const COMMANDS: &[Command] = &[
     cmd("app.palette", &[], "Toggle the command palette: every command by name, with its key; calling again closes it."),
     cmd("app.settings", &[opt("section")], "Open the settings (section: look, alerts, updates)."),
     cmd("app.check_updates", &[], "Look for a newer Herdr and herdr-core now."),
-    cmd("app.fork_update", &[], "A fork build: open an agent with the prompt to merge the newer stable release into the fork and install it."),
+    cmd("app.fork_update", &[], "A fork build: open an agent in a background tab with the prompt to merge the newer stable release into the fork and install it; while it runs, show it instead."),
     cmd("app.update_core", &[], "Update herdr-core to its latest release of this generation; terminals keep running."),
     cmd("app.reset", &[], "The escape hatch: set the shown layout and keys aside, back to the default screen."),
     cmd("app.theme", &[req("name")], "Use a theme (a preset or themes/<name>.json)."),

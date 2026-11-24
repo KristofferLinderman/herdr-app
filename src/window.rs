@@ -494,6 +494,8 @@ pub struct AppWindow {
     /// The downloaded update the frame's pill offers, and the one closed for now.
     /// What's waiting, in words (`update_label`).
     update_ready: Option<String>,
+    /// A fork build: the version an agent was started on (`app.fork_update`) and its terminal.
+    fork_agent: Option<(String, String)>,
     update_dismissed: Option<String>,
     core_update_error_dismissed: Option<String>,
     update_success: bool,
@@ -603,6 +605,7 @@ impl AppWindow {
             file_events,
             polls: 0,
             update_ready: None,
+            fork_agent: None,
             update_dismissed: None,
             core_update_error_dismissed: None,
             update_success: false,
@@ -3777,12 +3780,20 @@ impl AppWindow {
             "app.check_updates" => crate::update::check_now(),
             "app.fork_update" => {
                 let Some(version) = crate::update::fork_out() else { return self.fail("no newer Herdr release is out for the fork") };
-                let args = json!({
-                    "argv": [crate::update::FORK_AGENT, "--prompt", crate::update::fork_prompt(&version)],
-                    "folder": crate::update::FORK_DIR,
-                    "name": format!("Herdr {version} update"),
-                });
-                self.run("terminal.open", args, window, cx);
+                // Already on it: show that agent instead of starting a second one.
+                if let Some(t) = self.fork_agent_running() {
+                    return self.run("pane.focus", json!({ "terminal": t }), window, cx);
+                }
+                // A background tab: the update takes a while and asks only at the end.
+                let argv = vec![crate::update::FORK_AGENT.to_owned(), "--prompt".into(), crate::update::fork_prompt(&version)];
+                let r = self.new_tab(None, &format!("Herdr {version} update"), Some(crate::update::FORK_DIR.into()), Some(argv), None, false, window);
+                if let Ok(t) = &r
+                    && let Some(t) = t["terminal"].as_str()
+                {
+                    self.fork_agent = Some((version, t.to_owned()));
+                }
+                self.answer(r);
+                cx.notify();
                 return;
             }
             "app.update_core" => {
@@ -5167,12 +5178,22 @@ impl AppWindow {
         }
     }
 
+    /// The terminal of the agent `app.fork_update` started for the release that is out, while it runs.
+    fn fork_agent_running(&self) -> Option<String> {
+        let (version, t) = self.fork_agent.as_ref()?;
+        (crate::update::fork_out().as_ref() == Some(version) && self.live.contains_key(t)).then(|| t.clone())
+    }
+
     fn render_update_pill(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let app_version = crate::update::ready();
         let app_ready = app_version.is_some();
         let fork_out = crate::update::fork_out();
+        let fork_agent = self.fork_agent_running();
         let success = self.update_ready.is_none() && self.update_success;
-        let label = self.update_ready.clone().or_else(|| success.then(|| format!("Updated to {}", env!("CARGO_PKG_VERSION"))))?;
+        let label = match (&fork_agent, &fork_out) {
+            (Some(_), Some(out)) => Some(format!("An agent is preparing Herdr {out}")),
+            _ => self.update_ready.clone().or_else(|| success.then(|| format!("Updated to {}", env!("CARGO_PKG_VERSION")))),
+        }?;
         let dismissal = app_version.clone().or_else(|| fork_out.clone()).map(|v| format!("app:{v}")).unwrap_or_else(|| label.clone());
         if self.update_dismissed.as_ref() == Some(&dismissal) { return None; }
         let pill = div()
@@ -5220,7 +5241,7 @@ impl AppWindow {
                     .text_color(c("accent_foreground"))
                     .font_weight(FontWeight::SEMIBOLD)
                     .hover(|s| s.opacity(0.9))
-                    .child("Prepare update")
+                    .child(if fork_agent.is_some() { "Show agent" } else { "Prepare update" })
                     .on_click(cx.listener(|this, _, w, cx| this.run("app.fork_update", json!({}), w, cx))),
             ))
             .child(div().id("update-notes").px(settings::z(6.0)).cursor_pointer().text_color(c("accent"))

@@ -544,7 +544,7 @@ No arguments.
 
 ## `app.fork_update`
 
-A fork build: open an agent with the prompt to merge the newer stable release into the fork and install it.
+A fork build: open an agent in a background tab with the prompt to merge the newer stable release into the fork and install it; while it runs, show it instead.
 
 No arguments.
 

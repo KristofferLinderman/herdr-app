@@ -680,7 +680,7 @@ The main ones:
   `app.check_updates` (only a successful check reports Up to date; a failed check clears the checked time and can be retried), `app.update_core` (a newer herdr-core of this generation, terminals kept;
   never one a package manager owns), `app.welcome`, `app.whats_new`, `app.feedback {message?, from?}` (from `"person"` or `"agent"`; opens a review window, where the person can paste up to 3 screenshots; never sends until the person clicks Send), `app.reset`,
   `app.theme {name}`, `app.zoom_in`, `app.zoom_out`, `app.zoom_reset`,
-  `app.update` (restart into a downloaded update), `app.fork_update` (a fork build, `scripts/install-fork-macos`: it only reports a newer stable release as `updates().app.out`; this opens an agent in the fork's checkout with the prompt to run `scripts/fork-update.sh`).
+  `app.update` (restart into a downloaded update), `app.fork_update` (a fork build, `scripts/install-fork-macos`: it only reports a newer stable release as `updates().app.out`; this opens an agent in a background tab in the fork's checkout with the prompt to run `scripts/fork-update.sh`; while it runs, the update pill says so and this shows it).
   Add machine lists all named ssh-config hosts in a scrollable list. Machines
   that need a password, a new host key or herdr-core installed show what to run
   in your own terminal; the picker updates once it is added. Other machines are

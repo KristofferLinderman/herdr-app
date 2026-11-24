@@ -6,7 +6,7 @@ Extends the fork's update flow (`app.fork_update`, `scripts/fork-update.sh`, com
 
 - Fork builds check the stable release line every hour without downloading (`check_fork` in `src/update.rs`).
 - The update pill says "Herdr X is out" and has "What changed" (the release notes) and "Prepare update".
-- "Prepare update" runs `app.fork_update`: opens `FORK_AGENT` (default `opencode`) in `FORK_DIR` with `fork_prompt(version)`, which runs `scripts/fork-update.sh <version>`: merge the tag, test, install into /Applications/Herdr.app, push (with gh's login when gh is signed in: the keychain helper can't prompt from the agent's terminal).
+- "Prepare update" runs `app.fork_update`: opens `FORK_AGENT` in a background tab (the pill then says "An agent is preparing Herdr X" with "Show agent" until that terminal ends) (default `opencode`) in `FORK_DIR` with `fork_prompt(version)`, which runs `scripts/fork-update.sh <version>`: merge the tag, test, install into /Applications/Herdr.app, push (with gh's login when gh is signed in: the keychain helper can't prompt from the agent's terminal).
 
 ## Decisions
 
