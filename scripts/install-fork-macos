@@ -16,7 +16,9 @@ export HERDR_FORK_AGENT="${HERDR_FORK_AGENT:-/Users/kristoffer/Code/Web/opencode
 # cargo, rustc and zig alike) and few jobs. Slower; HERDR_BUILD_JOBS=0 lifts the cap.
 jobs="${HERDR_BUILD_JOBS:-4}"
 [[ $jobs == 0 ]] && jobs=$(sysctl -n hw.ncpu)
+started=$SECONDS
 taskpolicy -b mise x zig@0.16.0 rust@stable -- "$HOME/.cargo/bin/cargo" build --release --locked -j "$jobs"
+echo "Built in $((SECONDS - started))s ($jobs jobs, background priority)"
 
 app=/Applications/Herdr.app
 backup="$HOME/.local/share/herdr-app-backup"
