@@ -6,7 +6,7 @@ Extends the fork's update flow (`app.fork_update`, `scripts/fork-update.sh`, com
 
 - Fork builds check the stable release line every hour without downloading (`check_fork` in `src/update.rs`).
 - The update pill says "Herdr X is out" and has "What changed" (the release notes) and "Prepare update".
-- "Prepare update" runs `app.fork_update`: opens `FORK_AGENT` in a background tab (the pill then says "An agent is preparing Herdr X" with "Show agent" until that terminal ends) (default `opencode`) in `FORK_DIR` with `fork_prompt(version)`, which runs `scripts/fork-update.sh <version>`: merge the tag, test, install into /Applications/Herdr.app, push (with gh's login when gh is signed in: the keychain helper can't prompt from the agent's terminal).
+- "Prepare update" runs `app.fork_update`: opens `FORK_AGENT` in a background tab (the pill then says "An agent is preparing Herdr X" with "Show agent" until that terminal ends) (default `opencode`) in `FORK_DIR` with `fork_prompt(version)`: one line pointing at `scripts/fork-update.md`, the steps the agent follows (edit that file to change them; no rebuild needed). They run `scripts/fork-clones.sh <version>` and then `scripts/fork-update.sh <version>`: merge the tag, test, install into /Applications/Herdr.app, push (with gh's login when gh is signed in: the keychain helper can't prompt from the agent's terminal).
 
 ## Decisions
 
@@ -54,7 +54,7 @@ A copy is "affected" when base and new differ. Whether the change touches the co
 - Own mods are compared against API changes from the profile's last run version (`update-notes.json` `last_run`) to the new one: the names on changed lines of `defaults/herdr.d.ts` and changed `cmd("…")` entries in `src/commands.rs`, matched as whole words in the mod's `.js` files. A changed `defaults/AGENTS.md` is pointed out for the agent to read.
 - Works with macOS's bash 3.2 and needs `jq`.
 
-## Agent prompt (`fork_prompt`) additions
+## Agent steps (`scripts/fork-update.md`)
 
 Before the merge (nothing is merged, built or installed until Kristoffer has answered):
 
