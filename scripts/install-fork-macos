@@ -12,7 +12,11 @@ cd "$(dirname "$0")/.."
 # (src/update.rs). HERDR_FORK_AGENT: the agent that update opens.
 export HERDR_APP_FORK=1
 export HERDR_FORK_AGENT="${HERDR_FORK_AGENT:-/Users/kristoffer/Code/Web/opencode/.cache/bin/opencode-local}"
-mise x zig@0.16.0 rust@stable -- "$HOME/.cargo/bin/cargo" build --release --locked
+# Gentle on the machine: background QoS (efficiency cores on Apple Silicon, for
+# cargo, rustc and zig alike) and few jobs. Slower; HERDR_BUILD_JOBS=0 lifts the cap.
+jobs="${HERDR_BUILD_JOBS:-4}"
+[[ $jobs == 0 ]] && jobs=$(sysctl -n hw.ncpu)
+taskpolicy -b mise x zig@0.16.0 rust@stable -- "$HOME/.cargo/bin/cargo" build --release --locked -j "$jobs"
 
 app=/Applications/Herdr.app
 backup="$HOME/.local/share/herdr-app-backup"

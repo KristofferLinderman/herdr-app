@@ -34,7 +34,10 @@ logged() {
     fail "$name (full log: $logs/$name.log)"
   fi
 }
-cargo() { mise x zig@0.16.0 rust@stable -- "$HOME/.cargo/bin/cargo" "$@"; }
+# Background QoS and few jobs, like install-fork-macos (HERDR_BUILD_JOBS=0 lifts the cap).
+jobs="${HERDR_BUILD_JOBS:-4}"
+[[ $jobs == 0 ]] && jobs=$(sysctl -n hw.ncpu)
+cargo() { taskpolicy -b mise x zig@0.16.0 rust@stable -- "$HOME/.cargo/bin/cargo" "$@"; }
 
 # --- Repository state.
 step "Preflight"
@@ -80,7 +83,7 @@ built="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
 
 # --- Verify.
 step "Tests"
-logged test cargo test --locked
+logged test cargo test --locked -j "$jobs" -- --test-threads "$jobs"
 
 # --- Install into /Applications/Herdr.app and confirm it's the fork at this version.
 step "Install"
