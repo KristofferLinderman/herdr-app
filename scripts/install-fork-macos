@@ -23,7 +23,7 @@ echo "Built in $((SECONDS - started))s ($jobs jobs, background priority)"
 app=/Applications/Herdr.app
 backup="$HOME/.local/share/herdr-app-backup"
 version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist" 2>/dev/null || echo unknown)
-if [[ -d $app && $version != *-fork.* ]]; then
+if [[ -d $app && $version != *fork* ]]; then
   mkdir -p "$backup"
   [[ -d $backup/Herdr-$version.app ]] || ditto "$app" "$backup/Herdr-$version.app"
   echo "Release build backed up to $backup/Herdr-$version.app"
@@ -36,13 +36,19 @@ mv -f "$app/Contents/MacOS/Herdr.new" "$app/Contents/MacOS/Herdr"
 chmod +x "$app/Contents/MacOS/Herdr"
 cp assets/icons/Herdr.icns "$app/Contents/Resources/Herdr.icns"
 
+# Shown as "0.1.17.fork (Build 9)": the build is the number of commits since the release tag,
+# so a newer fork build always has a bigger number. The commit stays findable in HerdrForkCommit.
 version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+build=$(git rev-list --count "v$version..HEAD" 2>/dev/null || git rev-list --count HEAD)
 commit=$(git rev-parse --short HEAD)
+[[ -z $(git status --porcelain --untracked-files=no) ]] || commit="$commit-dirty"
 plist="$app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version-fork.$commit" "$plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $version" "$plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version.fork" "$plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build" "$plist"
+/usr/libexec/PlistBuddy -c "Delete :HerdrForkCommit" "$plist" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :HerdrForkCommit string $commit" "$plist"
 # Same bundle id keeps permissions (mic, camera, automation) the release had.
 codesign --force --sign - "$app"
 ln -sfn "$app/Contents/MacOS/Herdr" "$HOME/.local/bin/herdr-app"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$app"
-echo "Installed fork $version-fork.$commit to $app. Quit and reopen Herdr to use it."
+echo "Installed fork $version.fork (Build $build, $commit) to $app. Quit and reopen Herdr to use it."

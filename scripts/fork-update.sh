@@ -89,8 +89,9 @@ logged test cargo test --locked -j "$jobs" -- --test-threads "$jobs"
 step "Install"
 logged install scripts/install-fork-macos
 installed="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Applications/Herdr.app/Contents/Info.plist)"
-[[ "$installed" == "$version-fork."* ]] || fail "installed app reports '$installed', expected $version-fork.*"
+[[ "$installed" == "$version.fork" ]] || fail "installed app reports '$installed', expected $version.fork"
 grep -q "Prepare update" /Applications/Herdr.app/Contents/MacOS/Herdr || fail "installed app is missing the fork's update check"
+installed="$installed (Build $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' /Applications/Herdr.app/Contents/Info.plist))"
 echo "$installed"
 
 step "Push"
