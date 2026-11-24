@@ -6,7 +6,7 @@ Extends the fork's update flow (`app.fork_update`, `scripts/fork-update.sh`, com
 
 - Fork builds check the stable release line every hour without downloading (`check_fork` in `src/update.rs`).
 - The update pill says "Herdr X is out" and has "What changed" (the release notes) and "Prepare update".
-- "Prepare update" runs `app.fork_update`: opens `FORK_AGENT` (default `opencode`) in `FORK_DIR` with `fork_prompt(version)`, which runs `scripts/fork-update.sh <version>`: merge the tag, test, install into /Applications/Herdr.app, push.
+- "Prepare update" runs `app.fork_update`: opens `FORK_AGENT` (default `opencode`) in `FORK_DIR` with `fork_prompt(version)`, which runs `scripts/fork-update.sh <version>`: merge the tag, test, install into /Applications/Herdr.app, push (with gh's login when gh is signed in: the keychain helper can't prompt from the agent's terminal).
 
 ## Decisions
 
@@ -58,8 +58,8 @@ A copy is "affected" when base and new differ. Whether the change touches the co
 After the merge, before restart:
 
 1. Run `scripts/fork-clones.sh <version>` and read `clones.md`.
-2. For each affected copy, per profile: summarize every upstream change in plain words, say whether it overlaps the copy's customizations, recommend one of the three choices, and ask Kristoffer.
-3. For each flagged own mod: show the API change and the proposed edit, ask.
+2. Write the review as markdown in the reply (OpenCode renders it; question text doesn't wrap or break lines well) and save it as `.cache/fork-update-v<ver>/review.md`: one `### A1 · <profile> · <copy>` section per affected copy, per profile, with short bullets (each upstream change in plain words, the copy's customizations, overlap, recommendation and why), then one `### B1 · <profile> · <own mod>` section per flagged own mod (API change, proposed edit).
+3. Ask one question per section, its text a single line pointing at the section (`A1 · herdr-app · my-agents: see A1 above`), the recommended option first.
 4. Write the answers under a `## Decisions` heading in `clones.md`.
 5. If nothing is affected, say so in one line and continue without stopping.
 

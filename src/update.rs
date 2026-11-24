@@ -119,8 +119,8 @@ In {FORK_DIR}, run `scripts/fork-update.sh {version}`. It merges the tag, runs t
 My copies of shipped mods and layouts, and my own mods (docs/fork-update-copies.md has the details):
 
 1. Once the merge is committed, run `scripts/fork-clones.sh {version}` and read .cache/fork-update-v{version}/clones.md. If nothing changed for any copy or own mod, say so in one line and carry on.
-2. For every copy whose original changed, profile by profile (ask separately even when both profiles have the same copy): explain each upstream change in plain words, say whether it overlaps what the copy customized, recommend one of these and ask me: Keep copy as is, Drop copy and use the original, or Re-clone and reapply my changes.
-3. For every own mod that uses a changed API: show the change and the edit you'd make, and ask me.
+2. Write the review as markdown in your reply (it gets rendered) and save the same text as .cache/fork-update-v{version}/review.md. One section per copy whose original changed, profile by profile (the same copy in both profiles is two sections), headed `### A1 · <profile folder> · <copy>` (A2, A3, ...), with short bullets: each upstream change in plain words, what the copy customized, whether they overlap, and your recommendation (Keep copy as is, Drop copy and use the original, or Re-clone and reapply my changes) with why. Then one section `### B1 · <profile folder> · <own mod>` per own mod that uses a changed API: the change and the edit you'd make.
+3. Then ask, one question per section: keep the question text to one line naming its section (`A1 · herdr-app · my-agents: see A1 above`), no explanations in the question itself; options are the three choices (or Apply edit / Skip for B sections), your recommendation first.
 4. Write my answers under `## Decisions` in clones.md. Don't edit anything in the profiles yet: copies reload as soon as they're saved, and the running Herdr is still the old version.
 
 Report any conflicts and how you resolved them, other fixes, the installed version and the decisions. I'll restart Herdr; your terminal keeps running. When I say it has restarted, check `herdr-app --version`, then apply the decisions:
@@ -741,6 +741,7 @@ mod tests {
         assert!(prompt.contains("git log v0.1.18..HEAD --no-merges"));
         assert!(prompt.contains("run `scripts/fork-clones.sh 0.1.18`"));
         assert!(prompt.contains("openOverlay({ mod })"));
+        assert!(prompt.contains(".cache/fork-update-v0.1.18/review.md"));
         assert_eq!(prompt, fork_prompt("0.1.18"));
     }
 

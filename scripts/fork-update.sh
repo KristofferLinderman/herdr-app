@@ -95,6 +95,11 @@ installed="$installed (Build $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersio
 echo "$installed"
 
 step "Push"
-logged push git push -u origin HEAD
+# gh's login, when gh is there: the keychain helper can't prompt from an agent's terminal.
+if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
+  logged push git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push -u origin HEAD
+else
+  logged push git push -u origin HEAD
+fi
 
 step "Done: $tag merged, tested, installed ($installed) and pushed. Restart Herdr to use it."
