@@ -116,7 +116,21 @@ In {FORK_DIR}, run `scripts/fork-update.sh {version}`. It merges the tag, runs t
 - Exit 1: read the named log, fix the cause in a separate fork commit, and re-run.
 - Never reset, force-push or discard work. Don't quit or restart Herdr.
 
-Finally report any conflicts and how you resolved them, other fixes, and the installed version. I'll restart Herdr to use it."
+My copies of shipped mods and layouts, and my own mods (docs/fork-update-copies.md has the details):
+
+1. Once the merge is committed, run `scripts/fork-clones.sh {version}` and read .cache/fork-update-v{version}/clones.md. If nothing changed for any copy or own mod, say so in one line and carry on.
+2. For every copy whose original changed, profile by profile (ask separately even when both profiles have the same copy): explain each upstream change in plain words, say whether it overlaps what the copy customized, recommend one of these and ask me: Keep copy as is, Drop copy and use the original, or Re-clone and reapply my changes.
+3. For every own mod that uses a changed API: show the change and the edit you'd make, and ask me.
+4. Write my answers under `## Decisions` in clones.md. Don't edit anything in the profiles yet: copies reload as soon as they're saved, and the running Herdr is still the old version.
+
+Report any conflicts and how you resolved them, other fixes, the installed version and the decisions. I'll restart Herdr; your terminal keeps running. When I say it has restarted, check `herdr-app --version`, then apply the decisions:
+
+- Keep: set `cloned_from.version` to {version}.
+- Drop: delete the copy and point everything that used it (layout `content.mod`, `terminal_menu`, `openOverlay({{ mod }})` in other mods, the !-lines for it in ~/.config/.gitignore) back to the original.
+- Re-clone: move the copy aside, `herdr-app do mod.clone` (or `layout.clone`) with the same name as `as` (`HERDR_APP_HOME` picks the profile; its window must be open, else ask me to open it), reapply my changes, delete the old copy.
+- Own mods: make the edits I agreed to.
+
+Then run `herdr-app check` on every changed mod and look at `herdr-app status` per profile, commit ~/.config with my commit skill (my-commit), and finish with each copy and own mod, the choice and the check result."
     )
 }
 
@@ -725,6 +739,8 @@ mod tests {
         let prompt = fork_prompt("v0.1.18");
         assert!(prompt.contains(&format!("In {FORK_DIR}, run `scripts/fork-update.sh 0.1.18`")));
         assert!(prompt.contains("git log v0.1.18..HEAD --no-merges"));
+        assert!(prompt.contains("run `scripts/fork-clones.sh 0.1.18`"));
+        assert!(prompt.contains("openOverlay({ mod })"));
         assert_eq!(prompt, fork_prompt("0.1.18"));
     }
 
