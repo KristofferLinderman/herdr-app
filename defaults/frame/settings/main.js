@@ -788,6 +788,8 @@ export default class Settings extends View {
       div().id(id).px(12).py(5).rounded(7).cursor_pointer().bg(t.accent).text_color(t.accent_foreground).text_size(13).font_semibold().hover((s) => s.opacity(0.9)).on_click(f).child(label);
     const app = !u.app.updates
       ? ["A build from source: it updates with git, not here.", null]
+      : u.app.fork && u.app.out
+        ? [`${u.app.out} is out. A fork build: an agent merges it into the fork and installs it.`, h_flex().gap(8).child(check("st-check-app") ?? div()).child(primary("st-fork-update", "Prepare update", () => { closeOverlay(props()?.overlay); run("app.fork_update"); }))]
       : u.app.ready
         ? [`${u.app.ready} is ready. Restart to switch now; it also switches when you quit.`, primary("st-app-update", "Restart to update", () => run("app.update"))]
         : [result, check("st-check-app")];

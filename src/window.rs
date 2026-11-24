@@ -868,7 +868,7 @@ impl AppWindow {
 
     /// After an update: unseen spotlights. Asked for: the pending range, or this version's notes.
     fn open_whats_new(&mut self, asked: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let notes = if asked { crate::update_notes::notes(crate::update::ready().as_deref()) } else { crate::update_notes::spotlights() };
+        let notes = if asked { crate::update_notes::notes(crate::update::pending().as_deref()) } else { crate::update_notes::spotlights() };
         if notes.is_empty() {
             self.run("app.settings", json!({ "section": "updates" }), window, cx);
             return;
@@ -3775,6 +3775,16 @@ impl AppWindow {
                 return;
             }
             "app.check_updates" => crate::update::check_now(),
+            "app.fork_update" => {
+                let Some(version) = crate::update::fork_out() else { return self.fail("no newer Herdr release is out for the fork") };
+                let args = json!({
+                    "argv": [crate::update::FORK_AGENT, "--prompt", crate::update::fork_prompt(&version)],
+                    "folder": crate::update::FORK_DIR,
+                    "name": format!("Herdr {version} update"),
+                });
+                self.run("terminal.open", args, window, cx);
+                return;
+            }
             "app.update_core" => {
                 if crate::update::core().ready.is_none() && crate::update::core().error.is_none() {
                     return self.fail("herdr-core is up to date");
@@ -5143,6 +5153,12 @@ impl AppWindow {
     fn update_label() -> Option<String> {
         let core = crate::update::core();
         let core = core.ready.filter(|_| !core.updating && core.managed.is_none());
+        if let Some(out) = crate::update::fork_out() {
+            return Some(match core {
+                Some(c) => format!("Herdr {out} is out · herdr-core {c} is ready"),
+                None => format!("Herdr {out} is out"),
+            });
+        }
         match (crate::update::ready(), core) {
             (Some(a), Some(c)) => Some(format!("Herdr {a} and herdr-core {c} are ready")),
             (Some(a), None) => Some(format!("Herdr {a} is ready")),
@@ -5154,9 +5170,10 @@ impl AppWindow {
     fn render_update_pill(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let app_version = crate::update::ready();
         let app_ready = app_version.is_some();
+        let fork_out = crate::update::fork_out();
         let success = self.update_ready.is_none() && self.update_success;
         let label = self.update_ready.clone().or_else(|| success.then(|| format!("Updated to {}", env!("CARGO_PKG_VERSION"))))?;
-        let dismissal = app_version.map(|v| format!("app:{v}")).unwrap_or_else(|| label.clone());
+        let dismissal = app_version.clone().or_else(|| fork_out.clone()).map(|v| format!("app:{v}")).unwrap_or_else(|| label.clone());
         if self.update_dismissed.as_ref() == Some(&dismissal) { return None; }
         let pill = div()
             .flex_none()
@@ -5190,8 +5207,24 @@ impl AppWindow {
                     .child("Restart")
                     .on_click(cx.listener(|this, _, w, cx| this.run("app.update", json!({}), w, cx))),
             ))
+            .when(fork_out.is_some(), |pill| pill.child(
+                div()
+                    .id("update-fork")
+                    .h(settings::z(24.0))
+                    .px(settings::z(10.0))
+                    .flex()
+                    .items_center()
+                    .rounded_full()
+                    .cursor_pointer()
+                    .bg(c("accent"))
+                    .text_color(c("accent_foreground"))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .hover(|s| s.opacity(0.9))
+                    .child("Prepare update")
+                    .on_click(cx.listener(|this, _, w, cx| this.run("app.fork_update", json!({}), w, cx))),
+            ))
             .child(div().id("update-notes").px(settings::z(6.0)).cursor_pointer().text_color(c("accent"))
-                .child(if app_ready || success { "What changed" } else { "Open Updates" })
+                .child(if app_ready || fork_out.is_some() || success { "What changed" } else { "Open Updates" })
                 .on_click(cx.listener(move |this, _, w, cx| {
                     if success { this.update_success = false; }
                     this.run("app.settings", json!({ "section": "updates" }), w, cx);

@@ -21,6 +21,18 @@ use std::sync::{Condvar, Mutex};
 use std::time::Duration;
 
 const EVERY: Duration = Duration::from_secs(60 * 60);
+/// A personal fork build (`scripts/install-fork-macos`). It checks the stable
+/// release line like a release, but updating means merging that release into
+/// the fork and building it (`scripts/fork-update.sh`), so it never downloads:
+/// it says what's out and hands an agent the update prompt (`app.fork_update`).
+const FORK: bool = option_env!("HERDR_APP_FORK").is_some();
+/// The fork's checkout, where the update runs.
+pub const FORK_DIR: &str = env!("CARGO_MANIFEST_DIR");
+/// The agent `app.fork_update` opens with the prompt.
+pub const FORK_AGENT: &str = match option_env!("HERDR_FORK_AGENT") {
+    Some(agent) => agent,
+    None => "opencode",
+};
 /// After a failed check or download (offline, a damaged file).
 const RETRY: Duration = Duration::from_secs(30 * 60);
 
@@ -80,6 +92,34 @@ pub fn ready() -> Option<String> {
     READY.lock().unwrap().clone()
 }
 
+/// A fork build: the newer stable release that is out, not yet merged.
+static OUT: Mutex<Option<String>> = Mutex::new(None);
+
+pub fn fork_out() -> Option<String> {
+    OUT.lock().unwrap().clone()
+}
+
+/// The version an update would bring: downloaded and ready, or out for the fork.
+pub fn pending() -> Option<String> {
+    ready().or_else(fork_out)
+}
+
+/// What `app.fork_update` gives the agent: run the fork's update script.
+pub fn fork_prompt(version: &str) -> String {
+    let version = version.trim_start_matches('v');
+    format!(
+        "Update my personal Herdr fork to the official stable release v{version}.
+
+In {FORK_DIR}, run `scripts/fork-update.sh {version}`. It merges the tag, runs the tests, installs the build into /Applications/Herdr.app and pushes, logging to .cache/fork-update-v{version}/.
+
+- Exit 2 (merge conflicts): resolve them keeping both upstream changes and the fork's behavior (fork commits: `git log v{version}..HEAD --no-merges`), ask me when intent is unclear, `git add` the files and re-run the script.
+- Exit 1: read the named log, fix the cause in a separate fork commit, and re-run.
+- Never reset, force-push or discard work. Don't quit or restart Herdr.
+
+Finally report any conflicts and how you resolved them, other fixes, and the installed version. I'll restart Herdr to use it."
+    )
+}
+
 /// The core the app runs, from its `server.status`, and a newer release waiting.
 #[derive(Clone, Default, serde::Serialize)]
 pub struct CoreInfo {
@@ -123,16 +163,16 @@ fn checks_app() -> Option<PathBuf> {
     root().filter(|_| option_env!("HERDR_APP_RELEASE").is_some() || std::env::var_os("HERDR_RELEASES_URL").is_some())
 }
 
-/// A release build checks the core; a source build only when pointed at a test release server.
+/// A release or fork build checks the core; a source build only when pointed at a test release server.
 fn checks_core() -> bool {
-    option_env!("HERDR_APP_RELEASE").is_some() || std::env::var_os("HERDR_RELEASES_URL").is_some()
+    FORK || option_env!("HERDR_APP_RELEASE").is_some() || std::env::var_os("HERDR_RELEASES_URL").is_some()
 }
 
 /// For the settings screen: both programs, what's waiting, when we last looked.
 pub fn status() -> serde_json::Value {
     serde_json::json!({
-        "app": { "version": env!("CARGO_PKG_VERSION"), "ready": ready(), "updates": checks_app().is_some() },
-        "notes": crate::update_notes::notes(ready().as_deref()),
+        "app": { "version": env!("CARGO_PKG_VERSION"), "ready": ready(), "updates": FORK || checks_app().is_some(), "fork": FORK, "out": fork_out() },
+        "notes": crate::update_notes::notes(pending().as_deref()),
         "core": core(),
         "checked": *CHECKED.lock().unwrap(),
         "checks": RUNNING.load(Ordering::Relaxed),
@@ -156,9 +196,9 @@ fn sleep(d: Duration) {
 
 /// Starts checking in the background: the app if it's an installed release, the core too.
 pub fn start() {
-    let app = checks_app();
+    let app = checks_app().filter(|_| !FORK);
     let core = checks_core();
-    if app.is_none() && !core {
+    if app.is_none() && !core && !FORK {
         tracing::info!("a build from source: no updates");
         return;
     }
@@ -170,6 +210,11 @@ pub fn start() {
             CHECKING.store(true, Ordering::Relaxed);
             let mut wait = EVERY;
             let mut succeeded = true;
+            if FORK && let Err(e) = check_fork() {
+                tracing::warn!("fork update check: {e}");
+                wait = RETRY;
+                succeeded = false;
+            }
             if let Some(root) = &app {
                 match check(root) {
                     Ok(found) => {
@@ -259,6 +304,28 @@ pub fn update_core() {
             }
         }
     });
+}
+
+/// A fork build: notes the latest stable release if it's newer, without downloading it.
+fn check_fork() -> Result<(), String> {
+    check_fork_from(&releases())
+}
+
+fn check_fork_from(releases: &str) -> Result<(), String> {
+    let path = "app/latest.json";
+    let text = curl_text(&format!("{releases}/{path}"))?;
+    let manifest: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("{path}: {e}"))?;
+    let version = manifest["version"].as_str().ok_or(format!("{path}: no version"))?;
+    let out = newer(version, env!("CARGO_PKG_VERSION")).then(|| version.to_owned());
+    // Notes are optional, as for a release: "What changed" before deciding to merge.
+    if let Some(version) = &out
+        && !crate::update_notes::has(version)
+        && let Ok(text) = curl_text(&format!("{releases}/app/{version}/changelog.md"))
+    {
+        crate::update_notes::cache(&text);
+    }
+    *OUT.lock().unwrap() = out;
+    Ok(())
 }
 
 /// Downloads the latest release if it's newer. Ok(Some): a version is ready.
@@ -637,6 +704,29 @@ fn after_update_managed(status: Result<serde_json::Value, String>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fork_check_notes_a_newer_release_without_downloading_it() {
+        let root = std::env::temp_dir().join(format!("herdr-fork-release-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("app")).unwrap();
+        let url = format!("file://{}", root.display());
+        // No targets: a fork check must never need (or fetch) a download.
+        std::fs::write(root.join("app/latest.json"), r#"{"version":"99.0.0"}"#).unwrap();
+        check_fork_from(&url).unwrap();
+        assert_eq!(fork_out().as_deref(), Some("99.0.0"));
+        std::fs::write(root.join("app/latest.json"), format!(r#"{{"version":"{}"}}"#, env!("CARGO_PKG_VERSION"))).unwrap();
+        check_fork_from(&url).unwrap();
+        assert_eq!(fork_out(), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn fork_prompt_runs_the_update_script_in_the_checkout() {
+        let prompt = fork_prompt("v0.1.18");
+        assert!(prompt.contains(&format!("In {FORK_DIR}, run `scripts/fork-update.sh 0.1.18`")));
+        assert!(prompt.contains("git log v0.1.18..HEAD --no-merges"));
+        assert_eq!(prompt, fork_prompt("0.1.18"));
+    }
 
     #[cfg(unix)]
     #[test]

@@ -342,7 +342,8 @@ export function fonts(): string[];
  *  `checks`: anything is checked at all (not in a build from source); `checking`: looking now
  *  (`app.check_updates` starts a look). */
 export function updates(): {
-  app: { version: string; ready: string | null; updates: boolean };
+  /** `fork`: a personal fork build, which never downloads; `out`: the newer stable release it would merge (`app.fork_update`). */
+  app: { version: string; ready: string | null; updates: boolean; fork: boolean; out: string | null };
   notes: { version: string; date: string; items: { headline: string; detail: string; fixed: boolean; media: { path: string; width: number; height: number }[] }[]; spotlight: boolean }[];
   core: { version: string | null; managed: string | null; ready: string | null; updating: boolean; error: string | null };
   checked: number | null;

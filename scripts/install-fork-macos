@@ -8,6 +8,10 @@ set -euo pipefail
 [[ $(uname -s) == Darwin ]] || { echo 'This installer requires macOS.' >&2; exit 1; }
 cd "$(dirname "$0")/.."
 
+# HERDR_APP_FORK: check the stable release line and offer the fork update
+# (src/update.rs). HERDR_FORK_AGENT: the agent that update opens.
+export HERDR_APP_FORK=1
+export HERDR_FORK_AGENT="${HERDR_FORK_AGENT:-/Users/kristoffer/Code/Web/opencode/.cache/bin/opencode-local}"
 mise x zig@0.16.0 rust@stable -- "$HOME/.cargo/bin/cargo" build --release --locked
 
 app=/Applications/Herdr.app

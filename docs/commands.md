@@ -542,6 +542,12 @@ Look for a newer Herdr and herdr-core now.
 
 No arguments.
 
+## `app.fork_update`
+
+A fork build: open an agent with the prompt to merge the newer stable release into the fork and install it.
+
+No arguments.
+
 ## `app.update_core`
 
 Update herdr-core to its latest release of this generation; terminals keep running.
