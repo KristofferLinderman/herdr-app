@@ -20,7 +20,7 @@ Extends the fork's update flow (`app.fork_update`, `scripts/fork-update.sh`, com
   3. **Re-clone and reapply:** take the new original fresh (`herdr-app do mod.clone` / `layout.clone`) and re-apply the copy's customizations on top. The new clone gets a fresh `cloned_from` from the app.
   - There is no "merge" choice and no "decide later" choice.
 - **Own mods (not copies):** when `defaults/herdr.d.ts`, the app commands (`src/commands.rs`) or `defaults/AGENTS.md` changed an API that one of Kristoffer's own mods uses, the agent shows the API change and a proposed edit, asks, and applies it after the restart if Kristoffer agrees.
-- **Profiles:** both /Users/kristoffer/.config/herdr-app and /Users/kristoffer/.config/herdr-app-personal are checked, and Kristoffer is asked separately per profile (the same copy name in both profiles is two questions).
+- **Profiles:** both /Users/kristoffer/.config/herdr-app and /Users/kristoffer/.config/herdr-app-personal are checked, and the same copy in both profiles is one review section and one question (the choice applies to both; Kristoffer answers in free text to split them).
 - **Commit:** once the decisions are applied and checked, the agent commits the /Users/kristoffer/.config changes with Kristoffer's `my-commit` skill, one commit per update (e.g. `chore(herdr): review mod copies for 0.1.18`).
 
 ## What counts
@@ -58,8 +58,8 @@ A copy is "affected" when base and new differ. Whether the change touches the co
 After the merge, before restart:
 
 1. Run `scripts/fork-clones.sh <version>` and read `clones.md`.
-2. Write the review as markdown in the reply (OpenCode renders it; question text doesn't wrap or break lines well) and save it as `.cache/fork-update-v<ver>/review.md`: one `### A1 · <profile> · <copy>` section per affected copy, per profile, with short bullets (each upstream change in plain words, the copy's customizations, overlap, recommendation and why), then one `### B1 · <profile> · <own mod>` section per flagged own mod (API change, proposed edit).
-3. Ask one question per section, its text a single line pointing at the section (`A1 · herdr-app · my-agents: see A1 above`), the recommended option first.
+2. Write the review as markdown in the reply (OpenCode renders it; question text doesn't wrap or break lines well) and save it as `.cache/fork-update-v<ver>/review.md`: one `### A1 · <copy>` section per affected copy covering every profile that has it (noting where the profiles' copies differ), with short bullets (each upstream change in plain words, the copy's customizations, overlap, recommendation and why), then one `### B1 · <own mod>` section per flagged own mod (API change, proposed edit).
+3. Ask one question per section, applying to every profile in it (Kristoffer uses the free-text answer to treat a profile differently), its text a single line pointing at the section (`A1 · my-agents: see A1 above`), the recommended option first.
 4. Write the answers under a `## Decisions` heading in `clones.md`.
 5. If nothing is affected, say so in one line and continue without stopping.
 
