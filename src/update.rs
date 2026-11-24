@@ -108,22 +108,23 @@ pub fn pending() -> Option<String> {
 pub fn fork_prompt(version: &str) -> String {
     let version = version.trim_start_matches('v');
     format!(
-        "Update my personal Herdr fork to the official stable release v{version}.
+        "Update my personal Herdr fork to the official stable release v{version}. Work in {FORK_DIR}; docs/fork-update-copies.md has the details. Never reset, force-push or discard work. Don't quit or restart Herdr.
 
-In {FORK_DIR}, run `scripts/fork-update.sh {version}`. It merges the tag, runs the tests, installs the build into /Applications/Herdr.app and pushes, logging to .cache/fork-update-v{version}/.
+First review, then merge: nothing is merged, built or installed until I've answered.
 
-- Exit 2 (merge conflicts): resolve them keeping both upstream changes and the fork's behavior (fork commits: `git log v{version}..HEAD --no-merges`), ask me when intent is unclear, `git add` the files and re-run the script.
-- Exit 1: read the named log, fix the cause in a separate fork commit, and re-run.
-- Never reset, force-push or discard work. Don't quit or restart Herdr.
-
-My copies of shipped mods and layouts, and my own mods (docs/fork-update-copies.md has the details):
-
-1. Once the merge is committed, run `scripts/fork-clones.sh {version}` and read .cache/fork-update-v{version}/clones.md. If nothing changed for any copy or own mod, say so in one line and carry on.
-2. Write the review as markdown in your reply (it gets rendered) and save the same text as .cache/fork-update-v{version}/review.md. One section per copy whose original changed, headed `### A1 · <copy>` (A2, A3, ...) and covering every profile that has it (name them, and point out where the profiles' copies differ, e.g. cloned from another version or customized differently), with short bullets: each upstream change in plain words, what the copy customized, whether they overlap, and your recommendation (Keep copy as is, Drop copy and use the original, or Re-clone and reapply my changes) with why. Then one section `### B1 · <own mod>` per own mod that uses a changed API, across profiles: the change and the edit you'd make.
-3. Then ask one question per section, its choice applying to every profile in it (I'll use the free-text answer to treat a profile differently): keep the question text to one line naming its section (`A1 · my-agents: see A1 above`), no explanations in the question itself; options are the three choices (or Apply edit / Skip for B sections), your recommendation first.
+1. Run `scripts/fork-clones.sh {version}` and read .cache/fork-update-v{version}/clones.md. It previews the merge (git merge-tree) without touching the checkout: the files the merge will conflict in, with their conflict hunks, then per profile the copies of shipped mods and layouts whose original changed, and own mods using a changed API.
+2. Write the review as markdown in your reply (it gets rendered) and save the same text as .cache/fork-update-v{version}/review.md. Start with a short summary: how many conflicts, copies and own mods need a decision. Then:
+   - `### C1 · <file>` per conflicted file: what the fork changed there and why (`git log v{version}..HEAD --no-merges -- <file>`), what upstream changed, and how you'd resolve it (normally keep both).
+   - `### A1 · <copy>` per copy whose original changed, covering every profile that has it (name them, and point out where the profiles' copies differ, e.g. cloned from another version or customized differently): each upstream change in plain words, what the copy customized, whether they overlap, and your recommendation (Keep copy as is, Drop copy and use the original, or Re-clone and reapply my changes) with why.
+   - `### B1 · <own mod>` per own mod using a changed API, across profiles: the change and the edit you'd make.
+   Short bullets throughout. If nothing needs a decision, say so in one line and go on to step 5.
+3. Ask one question per section, its choice applying to every profile in it (I'll use the free-text answer to treat a profile differently). The question text is one line naming its section (`A1 · my-agents: see A1 above`), no explanations in it; your recommendation first. Options: for C, Resolve as proposed / Keep the fork's side / Take upstream's side; for A, the three choices; for B, Apply edit / Skip.
 4. Write my answers under `## Decisions` in clones.md. Don't edit anything in the profiles yet: copies reload as soon as they're saved, and the running Herdr is still the old version.
+5. Run `scripts/fork-update.sh {version}`. It merges the tag, runs the tests, installs the build into /Applications/Herdr.app and pushes, logging to .cache/fork-update-v{version}/.
+   - Exit 2 (merge conflicts): resolve them as I decided, `git add` the files and re-run. Ask me only about conflicts the review didn't cover.
+   - Exit 1: read the named log, fix the cause in a separate fork commit, and re-run.
 
-Report any conflicts and how you resolved them, other fixes, the installed version and the decisions. I'll restart Herdr; your terminal keeps running. When I say it has restarted, check `herdr-app --version`, then apply the decisions:
+Report how the conflicts were resolved, other fixes and the installed version. I'll restart Herdr; your terminal keeps running. When I say it has restarted, check `herdr-app --version`, then apply the decisions:
 
 - Keep: set `cloned_from.version` to {version}.
 - Drop: delete the copy and point everything that used it (layout `content.mod`, `terminal_menu`, `openOverlay({{ mod }})` in other mods, the !-lines for it in ~/.config/.gitignore) back to the original.
@@ -737,9 +738,11 @@ mod tests {
     #[test]
     fn fork_prompt_runs_the_update_script_in_the_checkout() {
         let prompt = fork_prompt("v0.1.18");
-        assert!(prompt.contains(&format!("In {FORK_DIR}, run `scripts/fork-update.sh 0.1.18`")));
+        assert!(prompt.contains(&format!("Work in {FORK_DIR}")));
+        assert!(prompt.contains("Run `scripts/fork-update.sh 0.1.18`"));
         assert!(prompt.contains("git log v0.1.18..HEAD --no-merges"));
-        assert!(prompt.contains("run `scripts/fork-clones.sh 0.1.18`"));
+        assert!(prompt.find("fork-clones.sh 0.1.18") < prompt.find("fork-update.sh 0.1.18"), "review before merging");
+        assert!(prompt.contains("Run `scripts/fork-clones.sh 0.1.18`"));
         assert!(prompt.contains("openOverlay({ mod })"));
         assert!(prompt.contains(".cache/fork-update-v0.1.18/review.md"));
         assert_eq!(prompt, fork_prompt("0.1.18"));

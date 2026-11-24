@@ -12,7 +12,7 @@ Extends the fork's update flow (`app.fork_update`, `scripts/fork-update.sh`, com
 
 - **Changelog:** the pill stays as it is. "What changed" already shows the release notes before updating. Nothing about copies is added to the pill or the notes.
 - **Who checks copies:** the update agent, as part of the same session that runs `fork-update.sh`.
-- **When to ask, when to edit:** the agent analyzes and asks before installing (or, at the latest, before Kristoffer restarts). It applies the edits only after Kristoffer has restarted Herdr into the new build. Copies hot-reload on save, so editing them while the old app runs could load code that uses APIs the old app lacks. Terminals survive the restart (herdr-core keeps them), so the same agent session continues.
+- **When to ask, when to edit:** the agent reviews and asks before anything is merged: `fork-clones.sh` previews the merge with `git merge-tree`, so merge conflicts are decided up front too, and the long test/build/install runs once the answers are in. It applies the edits only after Kristoffer has restarted Herdr into the new build. Copies hot-reload on save, so editing them while the old app runs could load code that uses APIs the old app lacks. Terminals survive the restart (herdr-core keeps them), so the same agent session continues.
 - **Ask every time:** every copy whose original changed between the two versions is brought up, even when the change looks unrelated to what the copy customized (e.g. a bug fix elsewhere in the file). No silent porting.
 - **Choices per copy:**
   1. **Keep copy as is:** skip the upstream change. Set `cloned_from.version` to the new version so the same changes don't come up again next time.
@@ -36,14 +36,15 @@ Shipped mods and layouts themselves are skipped (Herdr replaces them on start).
 ## Which versions get compared
 
 - **Base:** what shipped as `cloned_from.version`. If that is the version being updated from, the fork's pre-merge HEAD (so the fork's own changes to defaults, e.g. `workspace-chrome`, are part of the base and don't show up as upstream changes). Otherwise the upstream tag `v<cloned_from.version>`: copies from older versions came from a release or a fork build near it. ("The newest fork commit at that Cargo version" was tried and rejected: upstream keeps the old version number on master until the release bump, so it hides changes made between the tag and the bump.)
-- **New:** the original at the fork's HEAD after merging the new tag.
+- **New:** the original in the merge's result: before merging, the tree `git merge-tree --write-tree HEAD v<ver>` would commit; after it, the fork's HEAD.
 - **Copy:** the file in the profile as it is now.
 
 A copy is "affected" when base and new differ. Whether the change touches the copy's own customizations (copy vs base) is part of the agent's analysis, not a filter.
 
 ## `scripts/fork-clones.sh <new version>`
 
-- The agent runs it once the merge of the tag is committed (it refuses to run before that). Read-only apart from the report; safe to re-run.
+- The agent runs it before the merge (it also works after, against the merged HEAD). Read-only apart from the report; safe to re-run.
+- Lists the files the merge will conflict in, with their conflict hunks (fork side above, upstream below), under `## Merge conflicts`.
 - Scans both profiles, resolves base/new per the rules above.
 - Writes `.cache/fork-update-v<ver>/clones.md`: per profile, per affected copy: name, original, `cloned_from.version`, the upstream diff (base → new), and the copy's own diff (base → copy). Then the own-mods section: API file diffs (old → new) and, per own mod, the changed symbols it uses.
 - Unaffected copies get one line each so the report shows they were checked.
@@ -55,13 +56,15 @@ A copy is "affected" when base and new differ. Whether the change touches the co
 
 ## Agent prompt (`fork_prompt`) additions
 
-After the merge, before restart:
+Before the merge (nothing is merged, built or installed until Kristoffer has answered):
 
 1. Run `scripts/fork-clones.sh <version>` and read `clones.md`.
-2. Write the review as markdown in the reply (OpenCode renders it; question text doesn't wrap or break lines well) and save it as `.cache/fork-update-v<ver>/review.md`: one `### A1 · <copy>` section per affected copy covering every profile that has it (noting where the profiles' copies differ), with short bullets (each upstream change in plain words, the copy's customizations, overlap, recommendation and why), then one `### B1 · <own mod>` section per flagged own mod (API change, proposed edit).
-3. Ask one question per section, applying to every profile in it (Kristoffer uses the free-text answer to treat a profile differently), its text a single line pointing at the section (`A1 · my-agents: see A1 above`), the recommended option first.
+2. Write the review as markdown in the reply (OpenCode renders it; question text doesn't wrap or break lines well) and save it as `.cache/fork-update-v<ver>/review.md`: a short summary, one `### C1 · <file>` section per conflicted file (what the fork and upstream changed there, the proposed resolution), one `### A1 · <copy>` section per affected copy covering every profile that has it (noting where the profiles' copies differ), with short bullets (each upstream change in plain words, the copy's customizations, overlap, recommendation and why), then one `### B1 · <own mod>` section per flagged own mod (API change, proposed edit).
+3. Ask one question per section, applying to every profile in it (Kristoffer uses the free-text answer to treat a profile differently), its text a single line pointing at the section (`A1 · my-agents: see A1 above`), the recommended option first. Conflicts: Resolve as proposed / Keep the fork's side / Take upstream's side.
 4. Write the answers under a `## Decisions` heading in `clones.md`.
-5. If nothing is affected, say so in one line and continue without stopping.
+5. If nothing needs a decision, say so in one line and continue without stopping.
+
+Then `scripts/fork-update.sh <version>`: merge (conflicts resolved as decided; only unforeseen ones are asked about), test, install, push.
 
 After the install, the agent reports the decisions and tells Kristoffer to restart. When Kristoffer says Herdr has restarted (the agent can confirm with `herdr-app --version` / `herdr-app status`):
 
@@ -81,7 +84,7 @@ After the install, the agent reports the decisions and tells Kristoffer to resta
 - **Original removed upstream:** report it; "Keep" is the only safe choice offered with a note, plus "Drop" if the copy is no longer used.
 - **Original renamed:** treated as removed; the agent mentions a likely new name if the diff shows one.
 - **A copy whose original the fork itself edits:** covered by using the fork's commits as base and new.
-- **Merge conflicts or test failures in fork-update.sh:** handled as today; the copy review runs once the merge is committed.
+- **Merge conflicts:** previewed and decided in the review; `fork-update.sh` still stops with exit 2 and the agent resolves them as decided. **Test failures:** handled as before (fix in a separate fork commit, re-run).
 
 ## Prerequisite (done)
 
