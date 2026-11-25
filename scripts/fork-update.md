@@ -14,7 +14,7 @@ First review, then merge: nothing is merged, built or installed until I've answe
    Short bullets throughout. If nothing needs a decision, say so in one line and go on to step 5.
 3. Ask one question per section, its choice applying to every profile in it (I'll use the free-text answer to treat a profile differently). The question text is one line naming its section (`A1 · my-agents: see A1 above`), no explanations in it; your recommendation first. Options: for C, Resolve as proposed / Keep the fork's side / Take upstream's side; for A, the three choices; for B, Apply edit / Skip.
 4. Write my answers under `## Decisions` in clones.md. Don't edit anything in the profiles yet: copies reload as soon as they're saved, and the running Herdr is still the old version.
-5. Run `scripts/fork-update.sh <version>`. It merges the tag, runs the tests, installs the build into /Applications/Herdr.app and pushes, logging to .cache/fork-update-v<version>/.
+5. Run `scripts/fork-update.sh <version>` in the foreground (not as a background job) with a 30-minute timeout (1800000 ms), so your turn stays open and Herdr shows you as working. It merges the tag, runs the tests, installs the build into /Applications/Herdr.app and pushes, logging to .cache/fork-update-v<version>/. It usually takes 8–13 minutes.
    - Exit 2 (merge conflicts): resolve them as I decided, `git add` the files and re-run. Ask me only about conflicts the review didn't cover.
    - Exit 1: read the named log, fix the cause in a separate fork commit, and re-run.
 
