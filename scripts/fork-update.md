@@ -18,7 +18,9 @@ First review, then merge: nothing is merged, built or installed until I've answe
    - Exit 2 (merge conflicts): resolve them as I decided, `git add` the files and re-run. Ask me only about conflicts the review didn't cover.
    - Exit 1: read the named log, fix the cause in a separate fork commit, and re-run.
 
-Report how the conflicts were resolved, other fixes and the installed version. I'll restart Herdr; your terminal keeps running. When I say it has restarted, check `herdr-app --version`, then apply the decisions:
+Report how the conflicts were resolved, other fixes and the installed version, and ask me to restart Herdr (every open Herdr window, the personal one too); your terminal keeps running. If any decision needs edits (Re-clone, Drop or own-mod edits), say plainly that they only happen after the restart. Then, in the same turn, start `scripts/fork-wait-restart.sh` as a background job with a timeout of a day (86400000 ms; the default would stop it after minutes) and end your turn: it exits once every running Herdr started after the install, and you're woken up then, so I don't have to tell you. If I say it has restarted first, go on without waiting for it. If it exits 1 (gave up after a day), remind me that the decisions are still pending.
+
+Once Herdr has restarted, check `herdr-app --version`, then apply the decisions:
 
 - Keep: set `cloned_from.version` to <version>.
 - Drop: delete the copy and point everything that used it (layout `content.mod`, `terminal_menu`, `openOverlay({ mod })` in other mods, the !-lines for it in ~/.config/.gitignore) back to the original.

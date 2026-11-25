@@ -66,7 +66,7 @@ Before the merge (nothing is merged, built or installed until Kristoffer has ans
 
 Then `scripts/fork-update.sh <version>`: merge (conflicts resolved as decided; only unforeseen ones are asked about), test, install, push.
 
-After the install, the agent reports the decisions and tells Kristoffer to restart. When Kristoffer says Herdr has restarted (the agent can confirm with `herdr-app --version` / `herdr-app status`):
+After the install, the agent reports and tells Kristoffer to restart, then runs `scripts/fork-wait-restart.sh` in the background: it exits once every running Herdr started after the install, which wakes the agent, so Kristoffer only has to restart (saying so works too). Then:
 
 6. Apply the decisions:
    - Keep: set `cloned_from.version` to the new version.
