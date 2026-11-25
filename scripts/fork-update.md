@@ -26,3 +26,5 @@ Report how the conflicts were resolved, other fixes and the installed version. I
 - Own mods: make the edits I agreed to.
 
 Then run `herdr-app check` on every changed mod and look at `herdr-app status` per profile, commit ~/.config with my commit skill (my-commit), and finish with each copy and own mod, the choice and the check result.
+
+As the very last line of that final report, write exactly: Ready to rumble, Mr. Panda
