@@ -28,6 +28,10 @@ code), even at the price of some repetition.
 `herdr-app --skill` prints the window manual in `src/SKILL.md`.
 Keep it current when changing agent-facing behavior.
 
+## UI changes
+
+Before changing a view, check the active Herdr profile's layout and keybindings to see what it actually uses. If a custom mod replaces the built-in view, change that mod (for example, `my-settings` or `my-agents`). If the profile uses the built-in view, use a layout or config change, or create or clone a mod that handles the request. Change built-in app code or shipped mods only when the request can't be handled through mods or configuration. Keep any necessary app change minimal so the fork stays easy to maintain and the mods and setup stay shareable.
+
 ## The guide users' agents read
 
 `defaults/AGENTS.md` is written into every user's `~/.config/herdr-app` on
