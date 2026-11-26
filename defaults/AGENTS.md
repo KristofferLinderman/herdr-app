@@ -643,6 +643,7 @@ The main ones:
   flips the smallest split containing both. Left-to-right becomes top-to-bottom
   (or vice versa). Panes keep their order, focus, and any nested splits.
   Omit `direction` when exactly two panes are visible in the active tab.
+  Release any divider you're dragging before flipping a split.
   `pane.focus {terminal}` prefers the first visible layout terminal block showing that
   address, then its model pane. Clicking a terminal block focuses it too.
   While a layout terminal block is focused, implicit split/close/zoom/go/swap and

@@ -1,4 +1,33 @@
 #[test]
+fn split_flip_waits_for_divider_release() {
+    in_own_process("split_flip_during_divider_drag");
+}
+
+#[gpui::test]
+fn split_flip_during_divider_drag(cx: &mut gpui::TestAppContext) {
+    use serde_json::json;
+    if !running_alone("split_flip_during_divider_drag") { return; }
+    let (view, cx) = open_window(cx, "unused", "", json!({
+        "id": "root", "type": "block", "content": { "tab": "active" }
+    }));
+    let mut tab = super::Tab::new("tb1", "", "p1", "t1");
+    tab.root.split("p1", super::Axis::Row, crate::model::pane("p2", "t2"), "split".into());
+    view.update_in(cx, |this, window, cx| {
+        this.model.add_space("sp1", "", "/tmp", tab);
+        this.documents.entry(String::new()).or_default().available = true;
+        this.drag = Some(super::Drag { container: "tb1".into(), index: 0, axis: super::Axis::Row });
+        let before = this.model.tab("tb1").unwrap().root.clone();
+        let reply = this.run_as("pane.flip_split", json!({}), false, window, cx);
+        assert_eq!(reply["error"], "release the divider before flipping a split");
+        assert_eq!(this.model.tab("tb1").unwrap().root, before);
+        this.finish_divider_drag(window, cx);
+        let reply = this.run_as("pane.flip_split", json!({}), false, window, cx);
+        assert_eq!(reply, json!({ "ok": true }));
+        assert_eq!(this.model.tab("tb1").unwrap().root.axis(), Some(super::Axis::Column));
+    });
+}
+
+#[test]
 fn dividers_follow_the_current_layout() {
     in_own_process("divider_interaction");
 }

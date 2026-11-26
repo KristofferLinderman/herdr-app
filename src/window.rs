@@ -3478,6 +3478,9 @@ impl AppWindow {
                 }
             }
             "pane.flip_split" => {
+                if self.drag.is_some() {
+                    return self.fail("release the divider before flipping a split");
+                }
                 let Some(from) = Self::owned(a, "pane").or_else(|| self.model.focused_pane()) else {
                     return self.fail("no pane to flip");
                 };
