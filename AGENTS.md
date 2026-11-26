@@ -1,8 +1,7 @@
 # Herdr app
 
-The Herdr 2 desktop app (`herdr-app`): a native GPUI client of
-[herdr-core](https://github.com/herdrdev/herdr-core). Can (`ogulcancelik`)
-maintains it.
+Kristoffer's fork of the Herdr 2 desktop app (`herdr-app`), a native GPUI client
+of [herdr-core](https://github.com/herdrdev/herdr-core).
 
 If AGENTS.local.md exists, read it too: the maintainer's local rules.
 
@@ -12,11 +11,10 @@ Preserve compatibility with released versions and installed user data.
 Discuss breaking changes and removal of compatibility code with the maintainer
 before changing documented behavior.
 
-## Before you grow the app's core: ask Can
+## Keep the app's core small
 
 The app's core (the model, machine layout documents, commands, and shared mod APIs)
-stays small; everything else is mods. Before adding anything to it, answer
-these three, then discuss with Can and wait for his go:
+stays small; everything else is mods. Before adding anything to it, consider:
 
 1. Does the app itself act on it (it changes what the app does, not only
    how something looks)?
@@ -25,8 +23,7 @@ these three, then discuss with Can and wait for his go:
 3. Can mods not do it correctly, even with care?
 
 If all three are no, it belongs in mods (their shared storage, their own
-code), even at the price of some repetition. Same for herdr-core: what the
-app asks of it goes through Can too.
+code), even at the price of some repetition.
 
 `herdr-app --skill` prints the window manual in `src/SKILL.md`.
 Keep it current when changing agent-facing behavior.
@@ -83,9 +80,9 @@ down` when done.
 
 ## Contributing
 
-Work on a branch and open a pull request to `master`. CI must pass and Can
-approves; merges are squashed. Commit messages: lowercase conventional
-commits, single line, no AI co-author lines. Only Can releases (a `v*` tag).
+Work on a branch and open a pull request to `master`. CI must pass;
+merges are squashed. Commit messages: lowercase conventional commits,
+single line, no AI co-author lines.
 
 CHANGELOG.md: every release gets a `## [x.y.z] - YYYY-MM-DD` section
 (`### New` / `### Fixed`), written at release time from the commits since the
