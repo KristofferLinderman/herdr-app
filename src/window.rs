@@ -3201,7 +3201,7 @@ impl AppWindow {
             if !args.is_object() { args = json!({}); }
             args["machine"] = json!(machine);
         }
-        if matches!(name, "space.new" | "space.close" | "space.rename" | "space.move" | "tab.new" | "tab.close" | "tab.rename" | "tab.move" | "pane.split" | "pane.close" | "pane.swap" | "pane.rename" | "pane.resize" | "terminal.keep" | "terminal.park") {
+        if matches!(name, "space.new" | "space.close" | "space.rename" | "space.move" | "tab.new" | "tab.close" | "tab.rename" | "tab.move" | "pane.split" | "pane.close" | "pane.swap" | "pane.flip_split" | "pane.rename" | "pane.resize" | "terminal.keep" | "terminal.park") {
             let node = ["id", "space", "pane"].into_iter().find_map(|k| Self::arg(&args, k));
             let target = node.and_then(|id| self.model.space(id).or_else(|| self.model.space_of(id))).or_else(|| self.model.active_space());
             let machine = if name == "space.new" { Self::arg(&args, "machine") }
@@ -3476,6 +3476,33 @@ impl AppWindow {
                 if let Err(e) = r {
                     return self.fail(e);
                 }
+            }
+            "pane.flip_split" => {
+                let Some(from) = Self::owned(a, "pane").or_else(|| self.model.focused_pane()) else {
+                    return self.fail("no pane to flip");
+                };
+                let Some(tab) = self.model.active_tab() else {
+                    return self.fail("no shown tab");
+                };
+                let panes = tab.shown().visible_blocks();
+                let mut panes = panes.into_iter().filter(|node| node.is_pane());
+                if !panes.clone().any(|node| node.id == from) {
+                    return self.fail(format!("pane.flip_split needs a pane in the shown tab, not {from:?}"));
+                }
+                let to = match a.get("direction") {
+                    None | Some(Value::Null) => match (panes.next(), panes.next(), panes.next()) {
+                        (Some(first), Some(second), None) => if first.id == from { second } else { first }.id.clone(),
+                        _ => return self.fail("pane.flip_split needs a direction unless exactly two panes are visible"),
+                    },
+                    Some(Value::String(dir)) if matches!(dir.as_str(), "left" | "right" | "up" | "down") => {
+                        let Some(to) = self.neighbor(&from, dir, false) else {
+                            return self.fail(format!("no visible pane {dir} of {from:?}"));
+                        };
+                        to
+                    }
+                    _ => return self.fail("pane.flip_split direction must be left, right, up or down"),
+                };
+                self.model.flip_split(&from, &to);
             }
             // ---- terminals
             "terminal.open" => {
@@ -5529,7 +5556,7 @@ fn swap_by(args: &Value) -> Result<SwapBy<'_>, String> {
 
 fn needs_model_pane(name: &str, args: &Value) -> bool {
     match name {
-        "pane.split" | "pane.close" | "pane.zoom" | "pane.swap" | "pane.rename" | "pane.resize" | "terminal.show" => AppWindow::arg(args, "pane").is_none(),
+        "pane.split" | "pane.close" | "pane.zoom" | "pane.swap" | "pane.flip_split" | "pane.rename" | "pane.resize" | "terminal.show" => AppWindow::arg(args, "pane").is_none(),
         "pane.go" => true,
         "terminal.open" | "terminal.keep" => matches!(AppWindow::arg(args, "place"), Some("right" | "down")),
         _ => false,
@@ -5813,11 +5840,17 @@ impl Render for AppWindow {
         let tracker = self.float_tracker(cx);
         let win_tracker = self.window_tracker(cx);
         let pane_drag = self.pane_drag_layer(cx);
+        let mut keys = key_context("Herdr", "layout", &self.layout_name);
+        if self.model.active_tab().is_some_and(|tab| {
+            tab.shown().visible_blocks().into_iter().filter(|node| node.is_pane()).take(3).count() == 2
+        }) {
+            keys.add(crate::keys::TWO_VISIBLE_PANES);
+        }
         div()
             .id("herdr")
             .track_focus(&self.focus)
             // `layout:<name>` key sections apply while that layout shows.
-            .key_context(key_context("Herdr", "layout", &self.layout_name))
+            .key_context(keys)
             .size_full()
             .relative()
             .bg(c("background"))

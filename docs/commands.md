@@ -287,6 +287,15 @@ Swap a pane (default: the focused one) with its neighbor in a direction, or with
 | `pane` | no |
 | `target` | no |
 
+## `pane.flip_split`
+
+Flip the smallest split containing a pane (default: the focused one) and its neighbor: left, right, up or down. Omit direction when exactly two panes are visible in the active tab.
+
+| Argument | Required |
+|---|---|
+| `direction` | no |
+| `pane` | no |
+
 ## `terminal.peek`
 
 Peek at a running terminal over the tab, with keep-as-tab and close controls.

@@ -89,6 +89,11 @@ the same tab. Give `direction` or `target`, not both. Focus stays with the same 
 herdr-app do pane.swap '{"pane":"p12","target":"p14"}'
 ```
 
+`pane.flip_split {pane?, direction?}` targets a visible neighbor the same way
+and flips the smallest split containing both panes. Pane order, focus, running
+programs and nested splits stay intact, e.g. `herdr-app do pane.flip_split:right`.
+Omit direction to flip the split when exactly two panes are visible in the active tab.
+
 `terminal.select_all {terminal?}` selects a terminal's whole screen and scrollback,
 ready for `terminal.copy`. Without a target it follows keyboard focus. In vim and
 other alternate-screen apps, it selects only that screen. Cmd+A runs it on macOS;

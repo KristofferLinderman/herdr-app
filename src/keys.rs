@@ -23,6 +23,7 @@ use std::collections::BTreeMap;
 
 /// The reserved shortcut that restores the default layout and keys.
 pub const ESCAPE_HATCH: &str = "ctrl-alt-shift-escape";
+pub const TWO_VISIBLE_PANES: &str = "TwoVisiblePanes";
 
 /// The shipped keys: prefix-free; plain ctrl+letter always stays with the
 /// program. Herdr uses ctrl+shift (defaults/keys.json), or cmd on macOS
@@ -195,17 +196,19 @@ pub fn parse(text: &str) -> Result<Vec<KeyBinding>, String> {
     let mut problems = Vec::new();
     for (section, keys) in &sections {
         let predicate = match tab(section) {
-            Ok(c) => Some(Rc::new(c)),
+            Ok(c) => Rc::new(c),
             Err(e) => {
                 problems.push(e);
                 continue;
             }
         };
+        let mut immediate_flips = Vec::new();
         for (keys, action) in keys {
             let string = match action {
                 Binding::String(action) => Some(current(action)),
                 Binding::Object(_) => None,
             };
+            let immediate_flip = string.as_deref() == Some("pane.flip_split");
             if let Some(action) = &string {
                 if gone_mod(action) {
                     continue;
@@ -235,12 +238,26 @@ pub fn parse(text: &str) -> Result<Vec<KeyBinding>, String> {
                 let native: Option<Box<dyn gpui::Action>> = None;
                 native.unwrap_or_else(|| Box::new(ShellAction::new(action.clone())))
             };
-            let binding = KeyBinding::load(keys, action, predicate.clone(), false, None, &gpui::DummyKeyboardMapper);
+            let context = if immediate_flip {
+                use KeyBindingContextPredicate::{And, Descendant, Identifier, Or};
+                let section = Box::new(predicate.as_ref().clone());
+                let two = Box::new(Identifier(TWO_VISIBLE_PANES.into()));
+                Rc::new(Or(
+                    Box::new(And(section.clone(), two.clone())),
+                    Box::new(Descendant(two, section)),
+                ))
+            } else {
+                predicate.clone()
+            };
+            let binding = KeyBinding::load(keys, action, Some(context), false, None, &gpui::DummyKeyboardMapper);
             match binding {
+                Ok(b) if immediate_flip => immediate_flips.push(b),
                 Ok(b) => out.push(b),
                 Err(e) => problems.push(format!("{section}.{keys}: {e}")),
             }
         }
+        // GPUI runs a complete chord before earlier extensions. Keep section precedence intact.
+        out.extend(immediate_flips);
     }
     if problems.is_empty() { Ok(out) } else { Err(problems.join("; ")) }
 }
@@ -307,6 +324,51 @@ mod tests {
         assert_eq!(super::current("context.new"), "tab.new");
         assert_eq!(super::current("mod.open:start"), "tab.new");
         assert_eq!(super::current("pane.zoom"), "pane.zoom");
+    }
+
+    #[test]
+    fn split_flip_prefix_dispatches_immediately_only_with_two_visible_panes() {
+        use gpui::{KeyContext, Keymap, Keystroke};
+
+        let keymap = Keymap::new(super::parse(r#"{
+            "global": {
+                "ctrl-s r": "pane.flip_split",
+                "ctrl-s r h": "pane.flip_split:left",
+                "ctrl-s r l": "pane.flip_split:right"
+            },
+            "layout:test": { "ctrl-s r": "pane.zoom" },
+            "terminal": { "ctrl-s r h": "tab.new" }
+        }"#).unwrap());
+        let mut input = vec![Keystroke::parse("ctrl-s").unwrap(), Keystroke::parse("r").unwrap()];
+        let mut root = KeyContext::default();
+        root.add("Herdr");
+        let (bindings, pending) = keymap.bindings_for_input(&input, &[root.clone()]);
+        assert!(bindings.is_empty());
+        assert!(pending);
+
+        root.add(super::TWO_VISIBLE_PANES);
+        let (bindings, pending) = keymap.bindings_for_input(&input, &[root.clone()]);
+        assert_eq!(bindings.len(), 1);
+        assert!(!pending);
+        assert_eq!(bindings[0].action().as_any().downcast_ref::<super::ShellAction>().unwrap().id(), "pane.flip_split");
+
+        let mut terminal = KeyContext::default();
+        terminal.add("Terminal");
+        let (_, pending) = keymap.bindings_for_input(&input, &[root.clone(), terminal]);
+        assert!(pending);
+
+        root.set("layout", "test");
+        let (bindings, pending) = keymap.bindings_for_input(&input, &[root]);
+        assert!(!pending);
+        assert_eq!(bindings[0].action().as_any().downcast_ref::<super::ShellAction>().unwrap().id(), "pane.zoom");
+
+        let mut root = KeyContext::default();
+        root.add("Herdr");
+        input.push(Keystroke::parse("h").unwrap());
+        let (bindings, pending) = keymap.bindings_for_input(&input, &[root]);
+        assert_eq!(bindings.len(), 1);
+        assert!(!pending);
+        assert_eq!(bindings[0].action().as_any().downcast_ref::<super::ShellAction>().unwrap().id(), "pane.flip_split:left");
     }
 
     #[cfg(target_os = "macos")]

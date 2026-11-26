@@ -559,6 +559,7 @@ shortcuts must then be added by hand.
   String actions keep their literal first-argument shorthand, including numeric
   indexes. `agent.select:2` selects the second agent in navigation order.
   `space.new:{work}` names a space `{work}`, and `space.new:{}` names it `{}`.
+  A string binding such as `"ctrl-s r": "pane.flip_split"` runs immediately with exactly two visible panes. Otherwise, longer bindings such as `"ctrl-s r h": "pane.flip_split:left"` still wait for a direction.
   Invalid binding objects or rejected arguments show an error toast when pressed;
   the key does not go to the terminal program.
 - Plain ctrl+letters go to the program unless bound. Programs rely on
@@ -623,7 +624,7 @@ The main ones:
 - Panes: `pane.split {direction: "right" | "down", pane?, argv? | mod?, props?}` (a new
   terminal, or a mod pane), `pane.close {pane?}`,
   `pane.zoom {pane?}`, `pane.focus {pane | terminal}`, `pane.go {direction}`,
-  `pane.swap {pane?, direction | target}`, `pane.rename {pane?, name}` ("": unnamed
+  `pane.swap {pane?, direction | target}`, `pane.flip_split {pane?, direction?}`, `pane.rename {pane?, name}` ("": unnamed
   again; `panes()[i].name`, kept with its tab), `pane.resize {direction, pane?, px?}` (moves
   the nearest border along that axis by px, default 40, as a drag would; a keyboard
   resize mode is a mod that runs it on h/j/k/l).
@@ -638,10 +639,14 @@ The main ones:
   `pane.swap {target}` trades the places of `pane` (default: the focused one) and
   `target`, another pane of the same tab; give `direction` or `target`, not both.
   A swap moves panes, not focus: the focused pane stays focused in its new place.
+  `pane.flip_split` targets a visible neighbor like `pane.swap {direction}` and
+  flips the smallest split containing both. Left-to-right becomes top-to-bottom
+  (or vice versa). Panes keep their order, focus, and any nested splits.
+  Omit `direction` when exactly two panes are visible in the active tab.
   `pane.focus {terminal}` prefers the first visible layout terminal block showing that
   address, then its model pane. Clicking a terminal block focuses it too.
   While a layout terminal block is focused, implicit split/close/zoom/go/swap and
-  `terminal.show` fail, as do `terminal.open`/`terminal.keep` with place right/down.
+  `terminal.show` and `pane.flip_split` fail, as do `terminal.open`/`terminal.keep` with place right/down.
   They never act on the terminal's source pane. An explicit `pane` still targets that
   model pane; composition edits belong to the mod (edit its layout instead).
   Closing panes, tabs or spaces ends the terminals in them. Core ends dependent

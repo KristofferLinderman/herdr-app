@@ -680,6 +680,18 @@ impl Node {
         }
     }
 
+    /// Flips the smallest split containing both panes, preserving child order and sizes.
+    pub fn flip_split(&mut self, from: &str, to: &str) {
+        let (Some(from), Some(to)) = (self.path_to(from), self.path_to(to)) else { return };
+        let Some((split, _)) = from.iter().zip(&to).take_while(|(a, b)| a == b).last() else { return };
+        let Some(node) = self.find_mut(split) else { return };
+        node.kind = match &mut node.kind {
+            Kind::Row { children } => Kind::Column { children: std::mem::take(children) },
+            Kind::Column { children } => Kind::Row { children: std::mem::take(children) },
+            _ => return,
+        };
+    }
+
     /// Swaps two nodes' places in the tree (sizes stay with the places).
     pub fn swap(&mut self, a: &str, b: &str) -> bool {
         let (Some(na), Some(nb)) = (self.find(a).cloned(), self.find(b).cloned()) else { return false };

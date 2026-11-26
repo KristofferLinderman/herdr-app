@@ -399,6 +399,12 @@ impl Model {
         Ok(())
     }
 
+    pub fn flip_split(&mut self, from: &str, to: &str) {
+        if let Some(tab) = self.tab_of_mut(from) {
+            tab.root.flip_split(from, to);
+        }
+    }
+
     /// Removes a pane. Returns what else closed: the tab, and the space if it was its last.
     pub fn remove_pane(&mut self, pane_id: &str) -> (bool, bool) {
         let Some(c) = self.tab_of_mut(pane_id) else { return (false, false) };
@@ -970,6 +976,32 @@ mod tests {
 
     fn pane_order(m: &Model, tab: &str) -> Vec<String> {
         m.tab(tab).unwrap().root.panes().iter().map(|n| n.id.clone()).collect()
+    }
+
+    #[test]
+    fn flipping_pane_split_keeps_order_sizes_and_focus() {
+        use crate::layout::Size;
+
+        let mut m = model_with_one();
+        m.split("x1", Axis::Row, "x2", "t2");
+        m.split("x2", Axis::Column, "x3", "t3");
+        m.focus_pane("x1");
+        m.tab_of_mut("x1").unwrap().root.find_mut("x1").unwrap().size = Some(Size::Weight { weight: 2.0 });
+        let original = m.active_tab().unwrap().root.clone();
+
+        m.flip_split("x1", "x3");
+        let root = &m.active_tab().unwrap().root;
+        assert_eq!(root.axis(), Some(Axis::Column));
+        assert_eq!(root.children(), original.children());
+        assert_eq!(m.focused_pane().as_deref(), Some("x1"));
+        assert_eq!(m.address_of("x3").as_deref(), Some("t3"));
+        m.flip_split("x1", "x2");
+        assert_eq!(m.active_tab().unwrap().root, original);
+
+        m.flip_split("x2", "x3");
+        let root = &m.active_tab().unwrap().root;
+        assert_eq!(root.axis(), Some(Axis::Row));
+        assert_eq!(root.parent_of("x2").unwrap().axis(), Some(Axis::Row));
     }
 
     #[test]
